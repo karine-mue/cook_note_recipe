@@ -1,47 +1,58 @@
-# 0. 「呪文」（Google Driveのマウント）
-from google.colab import drive
-drive.mount('/content/drive')
-
 import os
-import zipfile
 import glob
-from bs4 import BeautifulSoup
 import json
+import xml.etree.ElementTree as ET
+from bs4 import BeautifulSoup
+import re
 
-# 1. パスの設定
-drive_path = "/content/drive/MyDrive/note_export_temp/"
+# すでに解凍済みのパスを指定
 extract_path = "/content/extracted_note/"
 output_file = "/content/note_corpus.jsonl"
 
-# 2. 解凍処理 (3つのzipを一括処理)
-os.makedirs(extract_path, exist_ok=True)
-zip_files = glob.glob(os.path.join(drive_path, "a1*.zip"))
+def clean_html(html_content):
+    if not html_content:
+        return ""
+    # HTMLタグを除去し、プレーンテキストを抽出
+    soup = BeautifulSoup(html_content, "html.parser")
+    text = soup.get_text(separator="\n")
+    # 余分な連続改行を圧縮（3行以上続く空行を2行に）
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
 
-print(f"解凍開始: {len(zip_files)}個のファイルを処理中...")
-for z in zip_files:
-    with zipfile.ZipFile(z, 'r') as zip_ref:
-        zip_ref.extractall(extract_path)
-
-# 3. テキスト抽出プロセス
-print("テキスト抽出中...")
 corpus = []
-html_files = glob.glob(os.path.join(extract_path, "**/*.html"), recursive=True)
+# XMLファイルを捕捉
+xml_files = glob.glob(os.path.join(extract_path, "**/*.xml"), recursive=True)
+print(f"発見されたXMLファイル: {len(xml_files)}件")
 
-for html_path in html_files:
-    with open(html_path, 'r', encoding='utf-8') as f:
-        soup = BeautifulSoup(f.read(), 'html.parser')
-        
-        title = soup.find('h1').get_text() if soup.find('h1') else "No Title"
-        content = soup.find('div', class_='note-common-styles__text-post-content')
-        if not content:
-             content = soup.find('main')
-        
-        text = content.get_text(separator='\n').strip() if content else ""
-        
-        if text:
-            corpus.append({"title": title, "body": text})
+# WordPress互換XMLの名前空間定義
+ns = {
+    'content': 'http://purl.org/rss/1.0/modules/content/',
+    'wp': 'http://wordpress.org/export/1.2/'
+}
 
-# 4. JSONLとして保存
+for xml_file in xml_files:
+    print(f"XML解析中: {xml_file}")
+    try:
+        tree = ET.parse(xml_file)
+        root = tree.getroot()
+        
+        # 全ての記事ノードを走査
+        for item in root.findall('.//item'):
+            title_elem = item.find('title')
+            title = title_elem.text if title_elem is not None else "No Title"
+            
+            # content:encoded から本文（HTML埋め込みテキスト）を取得
+            content_elem = item.find('content:encoded', ns)
+            content_raw = content_elem.text if content_elem is not None else ""
+            
+            text = clean_html(content_raw)
+            if text:
+                corpus.append({"title": title, "body": text})
+                
+    except Exception as e:
+        print(f"パースエラー ({xml_file}): {e}")
+
+# JSONLとして保存
 with open(output_file, 'w', encoding='utf-8') as f:
     for entry in corpus:
         f.write(json.dumps(entry, ensure_ascii=False) + '\n')
