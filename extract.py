@@ -7,7 +7,7 @@ import re
 
 # すでに解凍済みのパスを指定
 extract_path = "/content/extracted_note/"
-output_file = "/content/note_corpus.jsonl"
+output_file = "/content/drive/MyDrive/note_corpus.jsonl"
 
 def clean_html(html_content):
     if not html_content:
