@@ -1,3 +1,7 @@
+# 0. 「呪文」（Google Driveのマウント）
+from google.colab import drive
+drive.mount('/content/drive')
+
 import os
 import zipfile
 import glob
@@ -21,19 +25,16 @@ for z in zip_files:
 # 3. テキスト抽出プロセス
 print("テキスト抽出中...")
 corpus = []
-# noteのエクスポート構造に合わせてパスを調整（通常は /html/ フォルダ内）
 html_files = glob.glob(os.path.join(extract_path, "**/*.html"), recursive=True)
 
 for html_path in html_files:
     with open(html_path, 'r', encoding='utf-8') as f:
         soup = BeautifulSoup(f.read(), 'html.parser')
         
-        # タイトルと本文の取得（noteの構造に依存）
         title = soup.find('h1').get_text() if soup.find('h1') else "No Title"
-        # 本文領域を指定（クラス名はnoteの仕様により変動の可能性あり）
         content = soup.find('div', class_='note-common-styles__text-post-content')
         if not content:
-             content = soup.find('main') # フォールバック
+             content = soup.find('main')
         
         text = content.get_text(separator='\n').strip() if content else ""
         
