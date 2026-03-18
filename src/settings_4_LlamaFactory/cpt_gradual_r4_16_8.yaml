@@ -1,0 +1,70 @@
+### ==============================================
+### Qwen3-4B 継続事前学習 - 炊飯式傾斜LoRA
+### はじめちょろちょろ なかぱっぱ ふたして蒸らす
+###
+### 浅層 (0-11):  r=4,  alpha=8   ← ちょろちょろ
+### 中層 (12-23): r=16, alpha=32  ← ぱっぱ
+### 深層 (24-35): r=8,  alpha=16  ← ふたして蒸らす
+### ==============================================
+
+### モデル
+model_name_or_path: Qwen/Qwen3-4B
+trust_remote_code: true
+
+### 学習ステージ
+stage: pt
+do_train: true
+
+### データセット
+dataset_dir: .
+dataset: qwen3_cpt_2048
+cutoff_len: 2048
+preprocessing_num_workers: 4
+
+### QLoRA設定（炊飯式傾斜）
+finetuning_type: lora
+lora_target: q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0.0
+quantization_bit: 4
+
+### 層ごとのrank傾斜（PEFTのrank_pattern/alpha_pattern）
+### LLaMA-FactoryはPEFTに設定を渡すので、
+### additional_target や loraplus は使えるが
+### rank_patternの直接指定はYAMLからは未サポートの可能性がある。
+###
+### その場合の代替: lora_rank を中間値(8)にして
+### layers_to_transform で段階的に学習する3段階方式:
+###
+### Phase 1: 深層のみ (24-35) r=8  → 短時間学習
+### Phase 2: 中層追加 (12-35) r=8  → 追加学習
+### Phase 3: 浅層追加 (0-35)  r=8  → 仕上げ
+###
+### ---- 以下は直接rank_patternが効く場合の設定 ----
+### ---- 効かない場合はPhase方式に切り替える ----
+
+### 学習パラメータ
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-5
+num_train_epochs: 1.0
+lr_scheduler_type: cosine
+warmup_steps: 50
+weight_decay: 0.01
+seed: 42
+
+### 精度
+bf16: true
+
+### オプティマイザ
+optim: adamw_8bit
+
+### ログとチェックポイント
+logging_steps: 10
+save_steps: 500
+output_dir: outputs_lf_gradual
+
+### その他
+gradient_checkpointing: true
+plot_loss: true

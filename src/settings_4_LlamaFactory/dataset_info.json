@@ -1,0 +1,8 @@
+{
+  "qwen3_cpt_2048": {
+    "file_name": "data/qwen3_4b_cpt_dataset_2048.jsonl",
+    "columns": {
+      "prompt": "text"
+    }
+  }
+}
